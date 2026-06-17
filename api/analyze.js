@@ -33,6 +33,10 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'NO_API_KEY_SET' });
   }
 
+  // 依FAQ筆數動態計算max_tokens，避免被截斷，也避免浪費
+  const itemCount = (faqText.match(/^Q\d+\./gm) || []).length || 10;
+  const dynamicMaxTokens = Math.min(Math.max(itemCount * 350, 4000), 64000);
+
   const SYSTEM = `你是FAQ優化專家。輸出JSON：{"items":[{"idx":0,"intent":"低","optimized":"優化回答","hook":"鉤子"}],"gaps":[]}`;
 
   let response;
@@ -46,7 +50,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5',
-        max_tokens: 16000,
+        max_tokens: dynamicMaxTokens,
         system: SYSTEM,
         messages: [{ role: 'user', content: `分析FAQ輸出JSON：\n${faqText}` }]
       })
