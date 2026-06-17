@@ -290,7 +290,7 @@ async function startAnalysis() {
     const res = await fetch('/api/analyze', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({rows, faqText, system: SYSTEM})
+      body: JSON.stringify({body: JSON.stringify({faqText})})
     });
     clearInterval(ticker); clearInterval(msgTick);
     bar.style.width = '100%';
