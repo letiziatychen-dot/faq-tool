@@ -290,7 +290,7 @@ async function startAnalysis() {
     const res = await fetch('/api/analyze', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({body: JSON.stringify({faqText})})
+      body: JSON.stringify({faqText})
     });
     clearInterval(ticker); clearInterval(msgTick);
     bar.style.width = '100%';
@@ -320,7 +320,8 @@ function renderResults(rows, json) {
 
   const cls = document.getElementById('secClassify');
   cls.innerHTML = '';
-  (json.items||[]).forEach(it => {
+  const sortedItemsForDisplay = [...(json.items||[])].sort((a,b) => a.idx - b.idx);
+  sortedItemsForDisplay.forEach(it => {
     const row = rows[it.idx];
     if (!row) return;
     const ic = it.intent==='低'?'i-low':it.intent==='中'?'i-mid':'i-high';
@@ -381,14 +382,18 @@ function downloadExcel() {
   const {rows, json} = analysisData;
   const imap = {低:'低｜我想知道',中:'中｜我需要嗎',高:'高｜我要怎麼做'};
   const data = [['分類','問題','原始回答','意圖等級','優化版回答＋連結＋鉤子']];
-  (json.items||[]).forEach(it => {
+
+  // 依原始 idx 排序，維持上傳順序
+  const sortedItems = [...(json.items||[])].sort((a,b) => a.idx - b.idx);
+
+  sortedItems.forEach(it => {
     const r = rows[it.idx];
     if (r) data.push([r.cat, r.q, r.a, imap[it.intent]||it.intent, it.optimized||'']);
   });
   if ((json.gaps||[]).length) {
     data.push([]);
     data.push(['【缺題建議】','','','','']);
-    json.gaps.forEach(g => data.push([imap[g.layer]||g.layer, g.suggest_q, '', '', g.suggest_a||'']));
+    json.gaps.forEach(g => data.push([imap[g.layer]||g.layer, g.suggest_q||'', '', '', g.suggest_a||'']));
   }
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(data);
