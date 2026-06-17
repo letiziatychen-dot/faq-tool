@@ -5,6 +5,7 @@ export default async function handler(req, res) {
 
   let body = req.body;
 
+  // Defensive: if body is a string, parse it manually
   if (typeof body === 'string') {
     try {
       body = JSON.parse(body);
@@ -15,6 +16,15 @@ export default async function handler(req, res) {
 
   if (!body) {
     return res.status(400).json({ error: 'NO_BODY_RECEIVED' });
+  }
+
+  // Defensive: handle double-wrapped body { body: "...json string..." }
+  if (body.body && typeof body.body === 'string' && !body.faqText) {
+    try {
+      body = JSON.parse(body.body);
+    } catch (e) {
+      // leave as is, will fail below with clear error
+    }
   }
 
   const { faqText } = body;
