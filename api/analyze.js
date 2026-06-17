@@ -3,10 +3,24 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { faqText } = req.body;
+  let body = req.body;
+
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body);
+    } catch (e) {
+      return res.status(400).json({ error: 'BODY_PARSE_FAILED', raw_body: body.substring(0, 200) });
+    }
+  }
+
+  if (!body) {
+    return res.status(400).json({ error: 'NO_BODY_RECEIVED' });
+  }
+
+  const { faqText } = body;
 
   if (!faqText) {
-    return res.status(400).json({ error: 'Missing faqText' });
+    return res.status(400).json({ error: 'Missing faqText', body_keys: Object.keys(body), body_received: JSON.stringify(body).substring(0, 200) });
   }
 
   if (!process.env.ANTHROPIC_API_KEY) {
