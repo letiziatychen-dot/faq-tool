@@ -43,9 +43,12 @@ export default async function handler(req, res) {
 
     let json;
     try {
-      json = JSON.parse(text.replace(/```json|```/g, '').trim());
+      const clean = text.replace(/```json|```/g, '').trim();
+      const match = clean.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('no json found');
+      json = JSON.parse(match[0]);
     } catch (e) {
-      throw new Error('AI 回傳格式錯誤');
+      return res.status(500).json({ error: 'AI 回傳格式錯誤，請重試', raw: text.substring(0, 200) });
     }
 
     return res.status(200).json(json);
