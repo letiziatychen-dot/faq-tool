@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FAQ 三層意圖分析工具</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F4F7FA;color:#2C3E50;min-height:100vh;padding:2rem 1rem}
+.container{max-width:720px;margin:0 auto}
+
+h1{font-size:22px;font-weight:600;color:#1A3A5C;margin-bottom:4px}
+.subtitle{font-size:13px;color:#5D6D7E;margin-bottom:2rem}
+
+.card{background:#fff;border-radius:12px;border:1px solid #E8EDF2;padding:1.5rem;margin-bottom:1rem}
+
+.upload-area{border:2px dashed #B0B8C4;border-radius:8px;padding:2rem;text-align:center;cursor:pointer;transition:all 0.15s;margin-bottom:1rem}
+.upload-area:hover,.upload-area.drag{background:#EAF4F9;border-color:#1A7A8A}
+.upload-area .icon{font-size:36px;margin-bottom:8px}
+.upload-area .label{font-size:15px;font-weight:500;margin-bottom:4px}
+.upload-area .sub{font-size:12px;color:#888}
+
+.file-chip{display:inline-flex;align-items:center;gap:6px;background:#EAF4F9;border:1px solid #1A7A8A;border-radius:6px;padding:5px 10px;font-size:12px;color:#1A3A5C;margin-bottom:1rem}
+.file-chip button{background:none;border:none;cursor:pointer;color:#5D6D7E;font-size:16px;line-height:1}
+
+.or-row{display:flex;align-items:center;gap:12px;margin-bottom:1rem}
+.or-line{flex:1;height:1px;background:#E8EDF2}
+.or-text{font-size:12px;color:#888}
+
+textarea{width:100%;height:140px;font-size:12px;font-family:monospace;resize:vertical;padding:10px;border:1px solid #E8EDF2;border-radius:8px;color:#2C3E50;line-height:1.6;background:#F4F7FA}
+textarea:focus{outline:none;border-color:#1A7A8A}
+
+.btn-row{display:flex;gap:8px;align-items:center;margin-top:1rem}
+.btn-sample{font-size:12px;color:#5D6D7E;background:none;border:1px solid #E8EDF2;padding:7px 14px;border-radius:6px;cursor:pointer}
+.btn-sample:hover{background:#F4F7FA}
+.btn-run{margin-left:auto;font-size:14px;font-weight:600;padding:9px 24px;border-radius:8px;cursor:pointer;background:#1A3A5C;color:#fff;border:none}
+.btn-run:disabled{opacity:0.4;cursor:not-allowed}
+.btn-run:hover:not(:disabled){background:#1A7A8A}
+
+.progress-bar{height:4px;background:#E8EDF2;border-radius:99px;overflow:hidden;margin-bottom:8px}
+.progress-inner{height:100%;width:0;background:#1A7A8A;border-radius:99px;transition:width 0.4s ease}
+.progress-msg{font-size:13px;color:#5D6D7E}
+
+.error{background:#FFF0F0;color:#C0392B;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:1rem;display:none}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1.25rem}
+.stat{background:#F4F7FA;border-radius:8px;padding:12px;text-align:center}
+.stat-n{font-size:24px;font-weight:600}
+.stat-l{font-size:11px;color:#5D6D7E;margin-top:2px}
+
+.tabs{display:flex;border-bottom:1px solid #E8EDF2;margin-bottom:1.25rem}
+.tab{font-size:13px;padding:8px 18px;background:none;border:none;color:#888;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.on{color:#1A3A5C;font-weight:600;border-bottom-color:#1A3A5C}
+
+.sec{display:none}
+.sec.on{display:block}
+
+.qcard{background:#F4F7FA;border-radius:8px;padding:1rem 1.25rem;margin-bottom:10px;border-left:3px solid #E8EDF2}
+.qcard.low{border-left-color:#1E7A4A}
+.qcard.mid{border-left-color:#C8860A}
+.qcard.high{border-left-color:#C0392B}
+.qcard-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.qcard h3{font-size:14px;font-weight:600;color:#1A3A5C}
+.qcard .cat{font-size:11px;color:#888;margin-bottom:8px}
+.qcard .body{font-size:13px;color:#5D6D7E;line-height:1.7;white-space:pre-wrap}
+.hook{color:#C8860A;font-weight:600}
+
+.ibadge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px}
+.i-low{background:#E1F5EE;color:#0F6E56}
+.i-mid{background:#FAEEDA;color:#854F0B}
+.i-high{background:#FAECE7;color:#993C1D}
+
+.gap-item{padding:12px 0;border-bottom:1px solid #E8EDF2}
+.gap-item:last-child{border-bottom:none}
+.gap-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.gap-q{font-size:13px;font-weight:600;color:#1A3A5C;margin-bottom:4px}
+.gap-issue{font-size:12px;color:#888;margin-bottom:4px}
+.gap-a{font-size:12px;color:#5D6D7E;line-height:1.6;white-space:pre-wrap}
+
+.bottom-row{display:flex;gap:8px;margin-top:1rem}
+.btn-reset{font-size:12px;color:#5D6D7E;background:none;border:1px solid #E8EDF2;padding:7px 14px;border-radius:6px;cursor:pointer}
+.btn-reset:hover{background:#F4F7FA}
+.btn-dl{font-size:13px;font-weight:600;padding:9px 20px;border-radius:8px;cursor:pointer;background:#1E7A4A;color:#fff;border:none;margin-left:auto}
+.btn-dl:hover{background:#165f39}
+
+.note{font-size:11px;color:#888;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>FAQ 三層意圖分析工具</h1>
+  <p class="subtitle">上傳 FAQ 檔案，自動分析意圖、優化回答、加鉤子，下載 Excel</p>
+
+  <div id="errorBox" class="error"></div>
+
+  <div class="card" id="panelInput">
+    <div class="upload-area" id="dropzone"
+      onclick="document.getElementById('fileInput').click()"
+      ondragover="event.preventDefault();this.classList.add('drag')"
+      ondragleave="this.classList.remove('drag')"
+      ondrop="handleDrop(event)">
+      <div class="icon">📂</div>
+      <div class="label">上傳 CSV 或 Excel 檔案</div>
+      <div class="sub">點擊選擇，或直接拖曳至此處</div>
+      <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleFile(this.files[0])">
+    </div>
+
+    <div id="fileChip" style="display:none" class="file-chip">
+      📄 <span id="fileName"></span>
+      <button onclick="clearFile()">×</button>
+    </div>
+
+    <div class="or-row">
+      <div class="or-line"></div>
+      <span class="or-text">或直接貼入文字</span>
+      <div class="or-line"></div>
+    </div>
+
+    <textarea id="textInput" placeholder="格式：分類[Tab]問題[Tab]回答，每行一筆&#10;&#10;例：&#10;益生菌常識版	益生菌的菌數要多少才會有用？	益生菌的有效性主要取決於菌株..."></textarea>
+    <p class="note">提示：從 Excel 複製三欄內容直接貼上即可</p>
+
+    <div class="btn-row">
+      <button class="btn-sample" onclick="loadSample()">載入範例</button>
+      <button class="btn-run" id="runBtn" onclick="startAnalysis()">開始分析 →</button>
+    </div>
+  </div>
+
+  <div class="card" id="panelProgress" style="display:none">
+    <div class="progress-bar"><div class="progress-inner" id="progressBar"></div></div>
+    <div class="progress-msg" id="progressMsg">正在分析⋯</div>
+  </div>
+
+  <div id="panelResult" style="display:none">
+    <div class="stats" id="statsRow"></div>
+    <div class="card">
+      <div class="tabs">
+        <button class="tab on" onclick="switchTab('classify')">意圖分類與優化</button>
+        <button class="tab" onclick="switchTab('gaps')">缺題建議</button>
+      </div>
+      <div id="secClassify" class="sec on"></div>
+      <div id="secGaps" class="sec"></div>
+      <div class="bottom-row">
+        <button class="btn-reset" onclick="resetAll()">↺ 重新分析</button>
+        <button class="btn-dl" onclick="downloadExcel()">⬇ 下載 Excel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let parsedRows = [];
+let analysisData = null;
+
+const SYSTEM = `你是一位 LINE OA FAQ 優化專家，熟悉「三層意圖設計法」。
+
+【三層意圖定義】
+・低意圖「我想知道」：用戶純粹想了解某個知識，尚未考慮自己需不需要
+・中意圖「我需要嗎」：用戶有具體生活困擾，或開始考慮是否需要補充
+・高意圖「我要怎麼做」：用戶已決定要行動，需要具體的選購或購買指引
+
+【鉤子規則】
+1. 每一題優化版回答的最後，必須另起一行加一句鉤子
+2. 鉤子必須讓用戶只需回覆 1-2 個字就能回應
+3. 鉤子不可以是開放式問句
+4. 鉤子結尾不要加括號選項
+5. 低→引導「這跟我有關嗎？」中→「我要怎麼挑？」高→完成購買行動
+
+【優化回答規則】
+1. 原始回答的知識內容完全不能增加或刪減
+2. 只能調整語氣，更溫馨口語
+3. 不可引用任何網路資料
+4. 回答最後空一行後加鉤子
+
+【連結規則】一題只帶一個連結，放在鉤子前一行
+・低意圖：不帶連結
+・中意圖選購意圖強（問怎麼選/推薦/適合我嗎）→ 帶產品頁
+・中意圖選購意圖不強（描述困擾/問症狀）→ 帶對應知識文
+・高意圖：一律帶產品頁
+
+【產品資訊】
+每日衡好益生菌：https://mall.cathay-hcm.com.tw/products/probiotics
+適合：便祕、脹氣、腸道菌相失衡、飲食不規律
+
+每日衡好葉黃素：https://happyhabit.tw/92es7e
+適合：長時間用眼、乾澀疲勞、外食族護眼、藍光防護
+
+【知識文】
+益生菌怎麼挑：https://mall.cathay-hcm.com.tw/zh-TW/blogs/happyhabit-nutrition-supplements/益生菌怎麼挑4大指標教你快速選對的方式
+便祕脹氣腸道：https://mall.cathay-hcm.com.tw/blogs/happyhabit-digestive-health/便秘脹氣消化不良腸道健康警訊與益生菌解方一次看懂
+腸胃保健：https://mall.cathay-hcm.com.tw/zh-TW/blogs/happyhabit-digestive-health
+葉黃素是什麼：https://mall.cathay-hcm.com.tw/zh-TW/blogs/happyhabit-eye/what-is-lutein
+葉黃素怎麼挑：https://mall.cathay-hcm.com.tw/zh-TW/blogs/happyhabit-eye/how-to-choose-lutein
+葉黃素常見疑問：https://mall.cathay-hcm.com.tw/zh-TW/blogs/happyhabit-eye/lutein-faq
+光源對眼睛：https://mall.cathay-hcm.com.tw/zh-TW/blogs/happyhabit-eye/outdoor_light_more_damaging
+
+【輸出格式 — 只回傳 JSON，不要任何說明文字】
+{
+  "items": [
+    {
+      "idx": 0,
+      "intent": "低|中|高",
+      "intent_label": "我想知道|我需要嗎|我要怎麼做",
+      "optimized": "完整優化回答含連結（如有）和鉤子",
+      "hook": "鉤子句子（單獨抽出）"
+    }
+  ],
+  "gaps": [
+    {
+      "layer": "低|中|高",
+      "issue": "缺口說明",
+      "suggest_q": "建議問題",
+      "suggest_a": "建議回答含連結和鉤子"
+    }
+  ]
+}`;
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropzone').classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile(f);
+}
+
+function handleFile(file) {
+  if (!file) return;
+  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('fileChip').style.display = 'inline-flex';
+  document.getElementById('textInput').value = '';
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      const data = rows.filter(r => r[1] && r[2]).slice(1);
+      parsedRows = data.map(r => ({cat:String(r[0]||''), q:String(r[1]||''), a:String(r[2]||'')}));
+    } catch(err) { showError('檔案讀取失敗，請改用 CSV 格式重試'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function clearFile() {
+  document.getElementById('fileChip').style.display = 'none';
+  document.getElementById('fileInput').value = '';
+  parsedRows = [];
+}
+
+function loadSample() {
+  document.getElementById('textInput').value =
+`益生菌常識版	益生菌的菌數要多少才會有用？	益生菌的有效性主要取決於菌株特異性與活菌數，而非單純的菌數高低。多數臨床研究使用的有效劑量範圍在每日 10 億到 100 億活菌之間。
+益生菌常識版	益生菌可以幫助解決便祕嗎？	某些益生菌有助於改善便祕。益生菌能透過多種機制改善便祕，包括產生短鏈脂肪酸，降低腸道 pH 值，改善腸道環境，搭配充足的膳食纖維，進而刺激腸道蠕動。
+益生菌常識版	怎麼挑選益生菌？	挑選益生菌掌握 3 原則：1.看菌株編號，選擇經科學實證的菌株。2.看保證菌數，確保產品在有效期限內活菌數達標。3.看包埋技術，有保護技術的益生菌存活率更高。`;
+  parsedRows = [];
+}
+
+function parseText(text) {
+  return text.split('\n')
+    .filter(l => l.trim())
+    .map(l => { const p = l.split('\t'); return {cat:p[0]||'', q:p[1]||'', a:p[2]||''}; })
+    .filter(r => r.q && r.a);
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorBox');
+  el.textContent = msg; el.style.display = 'block';
+}
+function hideError() { document.getElementById('errorBox').style.display = 'none'; }
+
+async function startAnalysis() {
+  hideError();
+  const textVal = document.getElementById('textInput').value.trim();
+  if (!parsedRows.length && !textVal) { showError('請上傳檔案或貼入 FAQ 文字'); return; }
+  const rows = parsedRows.length ? parsedRows : parseText(textVal);
+  if (!rows.length) { showError('無法解析，請確認格式：分類 Tab 問題 Tab 回答'); return; }
+
+  document.getElementById('panelInput').style.display = 'none';
+  document.getElementById('panelProgress').style.display = 'block';
+
+  const bar = document.getElementById('progressBar');
+  let pct = 0;
+  const ticker = setInterval(() => { pct = Math.min(pct + Math.random()*5, 88); bar.style.width = pct+'%'; }, 500);
+  const msgs = ['正在讀取 FAQ 內容⋯','分析意圖分層⋯','優化回答文案⋯','加入鉤子與連結⋯','找出缺題⋯'];
+  let mi = 0;
+  const msgTick = setInterval(() => { if(mi<msgs.length) document.getElementById('progressMsg').textContent = msgs[mi++]; }, 2500);
+
+  const faqText = rows.map((r,i) => `Q${i+1}. [${r.cat}] ${r.q}\nA: ${r.a}`).join('\n\n');
+
+  try {
+    const res = await fetch('/api/analyze', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({rows, faqText, system: SYSTEM})
+    });
+    clearInterval(ticker); clearInterval(msgTick);
+    bar.style.width = '100%';
+    if (!res.ok) throw new Error(`伺服器錯誤 ${res.status}`);
+    const json = await res.json();
+    analysisData = {rows, json};
+    setTimeout(() => {
+      document.getElementById('panelProgress').style.display = 'none';
+      document.getElementById('panelResult').style.display = 'block';
+      renderResults(rows, json);
+    }, 300);
+  } catch(err) {
+    clearInterval(ticker); clearInterval(msgTick);
+    document.getElementById('panelProgress').style.display = 'none';
+    document.getElementById('panelInput').style.display = 'block';
+    showError(err.message || '分析失敗，請稍後再試');
+  }
+}
+
+function renderResults(rows, json) {
+  const counts = {低:0,中:0,高:0};
+  (json.items||[]).forEach(it => { if(counts[it.intent]!==undefined) counts[it.intent]++; });
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat"><div class="stat-n" style="color:#1E7A4A">${counts['低']}</div><div class="stat-l">低意圖｜我想知道</div></div>
+    <div class="stat"><div class="stat-n" style="color:#C8860A">${counts['中']}</div><div class="stat-l">中意圖｜我需要嗎</div></div>
+    <div class="stat"><div class="stat-n" style="color:#C0392B">${counts['高']}</div><div class="stat-l">高意圖｜我要怎麼做</div></div>`;
+
+  const cls = document.getElementById('secClassify');
+  cls.innerHTML = '';
+  (json.items||[]).forEach(it => {
+    const row = rows[it.idx];
+    if (!row) return;
+    const ic = it.intent==='低'?'i-low':it.intent==='中'?'i-mid':'i-high';
+    const cls2 = it.intent==='低'?'low':it.intent==='中'?'mid':'high';
+    const label = it.intent==='低'?'低｜我想知道':it.intent==='中'?'中｜我需要嗎':'高｜我要怎麼做';
+    const bodyEsc = esc(it.optimized||'');
+    const hookEsc = esc(it.hook||'');
+    const bodyHtml = hookEsc ? bodyEsc.replace(hookEsc, `<span class="hook">${hookEsc}</span>`) : bodyEsc;
+    const div = document.createElement('div');
+    div.className = `qcard ${cls2}`;
+    div.innerHTML = `
+      <div class="qcard-top"><span class="ibadge ${ic}">${label}</span><h3>${esc(row.q)}</h3></div>
+      <div class="cat">${esc(row.cat)}</div>
+      <div class="body">${bodyHtml}</div>`;
+    cls.appendChild(div);
+  });
+
+  const gaps = document.getElementById('secGaps');
+  gaps.innerHTML = '';
+  if (!(json.gaps||[]).length) {
+    gaps.innerHTML = '<p style="font-size:13px;color:#888;padding:1rem 0">三層意圖分佈均衡，未發現明顯缺口。</p>';
+  } else {
+    (json.gaps||[]).forEach(g => {
+      const ic = g.layer==='低'?'i-low':g.layer==='中'?'i-mid':'i-high';
+      const label = g.layer==='低'?'低｜我想知道':g.layer==='中'?'中｜我需要嗎':'高｜我要怎麼做';
+      const div = document.createElement('div');
+      div.className = 'gap-item';
+      div.innerHTML = `
+        <div class="gap-top"><span class="ibadge ${ic}">${label}</span></div>
+        <div class="gap-issue">${esc(g.issue)}</div>
+        <div class="gap-q">建議新增：${esc(g.suggest_q)}</div>
+        <div class="gap-a">${esc(g.suggest_a||'')}</div>`;
+      gaps.appendChild(div);
+    });
+  }
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.className = 'tab'+((['classify','gaps'][i]===name)?' on':'');
+  });
+  document.querySelectorAll('.sec').forEach(s => {
+    s.className = 'sec'+(s.id==='sec'+name.charAt(0).toUpperCase()+name.slice(1)?' on':'');
+  });
+}
+
+function resetAll() {
+  analysisData = null; parsedRows = [];
+  document.getElementById('panelResult').style.display = 'none';
+  document.getElementById('panelInput').style.display = 'block';
+  document.getElementById('textInput').value = '';
+  document.getElementById('progressBar').style.width = '0';
+  clearFile(); hideError();
+}
+
+function downloadExcel() {
+  if (!analysisData) return;
+  const {rows, json} = analysisData;
+  const imap = {低:'低｜我想知道',中:'中｜我需要嗎',高:'高｜我要怎麼做'};
+  const data = [['分類','問題','原始回答','意圖等級','優化版回答＋連結＋鉤子']];
+  (json.items||[]).forEach(it => {
+    const r = rows[it.idx];
+    if (r) data.push([r.cat, r.q, r.a, imap[it.intent]||it.intent, it.optimized||'']);
+  });
+  if ((json.gaps||[]).length) {
+    data.push([]);
+    data.push(['【缺題建議】','','','','']);
+    json.gaps.forEach(g => data.push([imap[g.layer]||g.layer, g.suggest_q, '', '', g.suggest_a||'']));
+  }
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{wch:20},{wch:28},{wch:45},{wch:14},{wch:52}];
+  XLSX.utils.book_append_sheet(wb, ws, 'FAQ分析結果');
+  XLSX.writeFile(wb, 'FAQ三層意圖分析結果.xlsx');
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
