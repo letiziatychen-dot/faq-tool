@@ -5,7 +5,6 @@ export default async function handler(req, res) {
 
   let body = req.body;
 
-  // Defensive: if body is a string, parse it manually
   if (typeof body === 'string') {
     try {
       body = JSON.parse(body);
@@ -18,19 +17,16 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'NO_BODY_RECEIVED' });
   }
 
-  // Defensive: handle double-wrapped body { body: "...json string..." }
   if (body.body && typeof body.body === 'string' && !body.faqText) {
     try {
       body = JSON.parse(body.body);
-    } catch (e) {
-      // leave as is, will fail below with clear error
-    }
+    } catch (e) {}
   }
 
   const { faqText } = body;
 
   if (!faqText) {
-    return res.status(400).json({ error: 'Missing faqText', body_keys: Object.keys(body), body_received: JSON.stringify(body).substring(0, 200) });
+    return res.status(400).json({ error: 'Missing faqText', body_keys: Object.keys(body) });
   }
 
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -50,7 +46,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5',
-        max_tokens: 2000,
+        max_tokens: 8000,
         system: SYSTEM,
         messages: [{ role: 'user', content: `分析FAQ輸出JSON：\n${faqText}` }]
       })
