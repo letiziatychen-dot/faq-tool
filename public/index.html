@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FAQ 三層意圖分析工具</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F4F7FA;color:#2C3E50;min-height:100vh;padding:2rem 1rem}
@@ -352,14 +354,21 @@ function renderResults(rows, json) {
       const badgeClass = isHook ? 'badge-hook' : 'badge-dist';
       const label = isHook ? '🔗 鉤子斷層' : '📊 意圖不均';
       const relatedRow = isHook && g.related_idx != null && rows[g.related_idx];
+      const intentLabel = g.intent === '低' ? '低' : g.intent === '中' ? '中' : g.intent === '高' ? '高' : '';
+      const ic = g.intent === '低' ? 'i-low' : g.intent === '中' ? 'i-mid' : 'i-high';
       const div = document.createElement('div');
       div.className = 'gap-item';
       div.innerHTML = `
-        <div class="gap-top"><span class="ibadge ${badgeClass}">${label}</span></div>
+        <div class="gap-top">
+          <span class="ibadge ${badgeClass}">${label}</span>
+          ${intentLabel ? `<span class="ibadge ${ic}">${intentLabel}</span>` : ''}
+          ${g.cat ? `<span style="font-size:11px;color:#888">${esc(g.cat)}</span>` : ''}
+        </div>
         ${relatedRow ? `<div class="gap-related">來自題目：「${esc(relatedRow.q)}」的鉤子</div>` : ''}
-        <div class="gap-issue">${esc(g.issue)}</div>
+        <div class="gap-issue">${esc(g.issue||'')}</div>
         <div class="gap-q">建議新增：${esc(g.suggest_q)}</div>
-        <div class="gap-a">${esc(g.suggest_a||'')}</div>`;
+        <div class="gap-a">${esc(g.suggest_c||g.suggest_a||'')}</div>
+        ${g.reason ? `<div style="font-size:11px;color:#888;margin-top:4px">📌 ${esc(g.reason)}</div>` : ''}`;
       gaps.appendChild(div);
     });
   }
@@ -383,34 +392,86 @@ function resetAll() {
   clearFile(); hideError();
 }
 
-function downloadExcel() {
+async function downloadExcel() {
   if (!analysisData) return;
   const {rows, json} = analysisData;
-  const imap = {低:'低｜我想知道',中:'中｜我需要嗎',高:'高｜我要怎麼做'};
-  const data = [['分類','問題','原始回答','意圖等級','優化版回答＋連結＋鉤子']];
 
-  // 依原始 idx 排序，維持上傳順序
+  const workbook = new ExcelJS.Workbook();
+  const ws = workbook.addWorksheet('FAQ分析結果');
+
+  ws.columns = [
+    { width: 18 },  // A 分類
+    { width: 30 },  // B 問題
+    { width: 45 },  // C 原始回答 / 建議回答
+    { width: 52 },  // D 優化版回答
+    { width: 10 },  // E 意圖等級
+    { width: 42 },  // F 新增原因（缺題區使用）
+  ];
+
+  // 主表頭
+  const hRow = ws.addRow(['分類', '問題', '原始回答', '優化版回答', '意圖等級', '']);
+  hRow.eachCell(cell => {
+    cell.font = { bold: true, color: { argb: 'FF1A3A5C' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EDF2' } };
+    cell.alignment = { wrapText: true, vertical: 'middle' };
+  });
+
+  // 主表資料列
   const sortedItems = [...(json.items||[])].sort((a,b) => a.idx - b.idx);
-
   sortedItems.forEach(it => {
     const r = rows[it.idx];
-    if (r) data.push([r.cat, r.q, r.a, imap[it.intent]||it.intent, it.optimized||'']);
+    if (!r) return;
+    const dRow = ws.addRow([r.cat, r.q, r.a, it.optimized||'', it.intent||'', '']);
+    dRow.getCell(4).alignment = { wrapText: true, vertical: 'top' };
+    dRow.getCell(3).alignment = { wrapText: true, vertical: 'top' };
   });
+
+  // 缺題建議區塊
   if ((json.gaps||[]).length) {
-    data.push([]);
-    data.push(['【缺題建議】','','','','']);
-    data.push(['缺口類型','建議問題','相關原題','說明','建議完整回答']);
+    ws.addRow([]);
+
+    // 區塊標題列
+    const titleRow = ws.addRow(['【缺題建議】', '', '', '', '', '']);
+    titleRow.getCell(1).font = { bold: true, size: 12, color: { argb: 'FF7B2D00' } };
+    titleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE8E3' } };
+    for (let c = 2; c <= 6; c++) {
+      titleRow.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE8E3' } };
+    }
+
+    // 缺題表頭
+    const gHRow = ws.addRow(['分類', '問題（建議新增題目）', '回答（建議新增回答）', '優化版回答（留空）', '意圖等級', '新增原因']);
+    gHRow.eachCell(cell => {
+      cell.font = { bold: true, color: { argb: 'FF7B2D00' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE8E3' } };
+      cell.alignment = { wrapText: true, vertical: 'middle' };
+    });
+
+    // 缺題資料列
     json.gaps.forEach(g => {
-      const sourceLabel = g.source || '';
-      const relatedQ = g.source === '鉤子斷層' && g.related_idx != null && rows[g.related_idx] ? rows[g.related_idx].q : '';
-      data.push([sourceLabel, g.suggest_q||'', relatedQ, g.issue||'', g.suggest_a||'']);
+      const relatedQ = g.source === '鉤子斷層' && g.related_idx != null && rows[g.related_idx]
+        ? rows[g.related_idx].q : '';
+      const reason = g.reason || (g.source === '鉤子斷層'
+        ? `鉤子無法承接缺口（來自：「${relatedQ}」）：${g.issue||''}`
+        : `意圖分布缺口：${g.issue||''}`);
+      const gRow = ws.addRow([
+        g.cat || '',
+        g.suggest_q || '',
+        g.suggest_c || g.suggest_a || '',
+        '',
+        g.intent || '',
+        reason
+      ]);
+      gRow.eachCell(cell => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF3E8' } };
+        cell.font = { color: { argb: 'FF5C3000' } };
+        cell.alignment = { wrapText: true, vertical: 'top' };
+      });
     });
   }
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{wch:20},{wch:28},{wch:45},{wch:14},{wch:52}];
-  XLSX.utils.book_append_sheet(wb, ws, 'FAQ分析結果');
-  XLSX.writeFile(wb, 'FAQ三層意圖分析結果.xlsx');
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  saveAs(blob, 'FAQ三層意圖分析結果.xlsx');
 }
 
 function esc(s) {

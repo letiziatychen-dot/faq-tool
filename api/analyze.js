@@ -38,7 +38,7 @@ export default async function handler(req, res) {
   const itemCount = (faqText.match(/^Q\d+\./gm) || []).length || 10;
   const dynamicMaxTokens = Math.min(Math.max(itemCount * 450, 4000), 64000);
 
-  const SYSTEM = `你是FAQ優化專家，採用三層意圖設計法分析FAQ。
+  const SYSTEM = `你是國泰健康管理 LINE OA FAQ 優化顧問，採用三層意圖設計法分析FAQ，目標是提升回答品質、對話延續率、FAQ之間的旅程銜接，並協助發現題庫缺口。
 
 【三層意圖定義】
 
@@ -164,9 +164,27 @@ https://happyhabit.tw/92es7e
 
 請優先確保來源二（鉤子斷層）被完整記錄，這是最重要的分析目的。每筆gaps的suggest_q和suggest_a絕對不可留空。
 
+【gaps欄位JSON格式說明】
+
+每筆gaps必須包含以下欄位：
+
+- source: "鉤子斷層" 或 "意圖不均"
+
+- related_idx: 鉤子斷層時填原題idx，意圖不均填-1
+
+- cat: 建議新增題目的分類（參考原FAQ的分類命名）
+
+- suggest_q: 建議新增的問題（B欄）
+
+- suggest_c: 建議新增的完整回答（C欄），格式為：主體內容 → 連結（如有）→ 鉤子，遵循連結規則與鉤子語氣規則
+
+- intent: 建議新增題目的意圖等級（低/中/高）
+
+- reason: 新增原因說明，格式為「來源類型：說明內容（引用原問題）」，例如「鉤子無法承接缺口：原題『XXX』的鉤子引導至YYY方向，但FAQ庫無對應題目」
+
 只輸出以下JSON格式，不要任何說明文字、不要markdown標記：
 
-{"items":[{"idx":0,"intent":"低","optimized":"優化回答內容\n鉤子問句？\n補充關心語句 😊"}],"gaps":[{"source":"鉤子斷層","related_idx":0,"issue":"缺口說明","suggest_q":"建議問題","suggest_a":"完整建議回答\n鉤子問句？\n補充關心語句 😊"}]}`;
+{"items":[{"idx":0,"intent":"低","optimized":"優化回答內容\n鉤子問句？\n補充關心語句 😊"}],"gaps":[{"source":"鉤子斷層","related_idx":0,"cat":"分類名稱","suggest_q":"建議問題","suggest_c":"建議回答主體\n連結（如有）\n鉤子問句？\n補充關心語句 😊","intent":"中","reason":"鉤子無法承接缺口：原題『XXX』的鉤子引導至YYY方向，FAQ庫無對應題目"}]}`;
 
   let response;
   try {
