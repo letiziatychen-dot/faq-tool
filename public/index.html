@@ -85,6 +85,9 @@ textarea:focus{outline:none;border-color:#1A7A8A}
 .btn-dl:hover{background:#165f39}
 
 .note{font-size:11px;color:#888;margin-top:6px}
+.badge-hook{background:#FAECE7;color:#993C1D}
+.badge-dist{background:#F0F0F0;color:#555}
+.gap-related{font-size:11px;color:#C0392B;margin-bottom:4px}
 </style>
 </head>
 <body>
@@ -345,12 +348,15 @@ function renderResults(rows, json) {
     gaps.innerHTML = '<p style="font-size:13px;color:#888;padding:1rem 0">三層意圖分佈均衡，未發現明顯缺口。</p>';
   } else {
     (json.gaps||[]).forEach(g => {
-      const ic = g.layer==='低'?'i-low':g.layer==='中'?'i-mid':'i-high';
-      const label = g.layer==='低'?'低｜我想知道':g.layer==='中'?'中｜我需要嗎':'高｜我要怎麼做';
+      const isHook = g.source === '鉤子斷層';
+      const badgeClass = isHook ? 'badge-hook' : 'badge-dist';
+      const label = isHook ? '🔗 鉤子斷層' : '📊 意圖不均';
+      const relatedRow = isHook && g.related_idx != null && rows[g.related_idx];
       const div = document.createElement('div');
       div.className = 'gap-item';
       div.innerHTML = `
-        <div class="gap-top"><span class="ibadge ${ic}">${label}</span></div>
+        <div class="gap-top"><span class="ibadge ${badgeClass}">${label}</span></div>
+        ${relatedRow ? `<div class="gap-related">來自題目：「${esc(relatedRow.q)}」的鉤子</div>` : ''}
         <div class="gap-issue">${esc(g.issue)}</div>
         <div class="gap-q">建議新增：${esc(g.suggest_q)}</div>
         <div class="gap-a">${esc(g.suggest_a||'')}</div>`;
@@ -393,7 +399,12 @@ function downloadExcel() {
   if ((json.gaps||[]).length) {
     data.push([]);
     data.push(['【缺題建議】','','','','']);
-    json.gaps.forEach(g => data.push([imap[g.layer]||g.layer, g.suggest_q||'', '', '', g.suggest_a||'']));
+    data.push(['缺口類型','建議問題','相關原題','說明','建議完整回答']);
+    json.gaps.forEach(g => {
+      const sourceLabel = g.source || '';
+      const relatedQ = g.source === '鉤子斷層' && g.related_idx != null && rows[g.related_idx] ? rows[g.related_idx].q : '';
+      data.push([sourceLabel, g.suggest_q||'', relatedQ, g.issue||'', g.suggest_a||'']);
+    });
   }
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(data);

@@ -1,4 +1,5 @@
 export default async function handler(req, res) {
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -33,49 +34,139 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'NO_API_KEY_SET' });
   }
 
+  // 依FAQ筆數動態計算max_tokens，避免被截斷
   const itemCount = (faqText.match(/^Q\d+\./gm) || []).length || 10;
-  const dynamicMaxTokens = Math.min(Math.max(itemCount * 350, 4000), 64000);
+  const dynamicMaxTokens = Math.min(Math.max(itemCount * 450, 4000), 64000);
 
   const SYSTEM = `你是FAQ優化專家，採用三層意圖設計法分析FAQ。
 
-【意圖定義】
-低：純知識探索，不帶連結
-中：有困擾或考慮購買，帶一個連結
-高：明確購買意圖，帶產品頁連結
+【三層意圖定義】
 
-【鉤子規則 - 絕對必須遵守】
-每一題的optimized欄位，最後必須換行後加一句鉤子問句。
-鉤子規則：
-1. 必須是疑問句，讓用戶只需回覆1-2個字
-2. 絕對不可以是肯定句或直述句結尾
+低：用戶純粹想了解知識，尚未考慮自己需不需要
+
+中：用戶有具體生活困擾，或開始考慮是否需要補充
+
+高：用戶已決定要行動，需要具體的選購或購買指引
+
+【字數規則】
+
+優化版回答的總字數，控制在原始回答字數 +50字左右（不強制，但避免過長）。
+
+【核心原則：鉤子必須能被現有FAQ接住 - 最重要規則】
+
+設計每一題的鉤子之前，先執行以下步驟：
+
+步驟1：判斷這題的意圖等級，並決定鉤子應該引導往哪個方向（低→中、中→高，或高→行動）
+
+步驟2：在全部FAQ題目中，搜尋是否已存在「使用者順著鉤子回答後，能對應到的下一題」
+
+  例如：低意圖題目的鉤子問「你有在服藥嗎」，要搜尋是否已有「服藥可以吃益生菌嗎」這類題目
+
+步驟3：
+
+  - 如果找到對應題目存在 → 鉤子的問法要對齊那一題的關鍵字或情境
+
+  - 如果找不到對應題目 → 仍可設計這個鉤子，但必須記錄這個缺口，列入gaps
+
+鉤子不是憑空問一個問題就結束，而是要確保問出去之後，FAQ庫裡有題目可以接住使用者的下一步。
+
+【鉤子語氣規則】
+
+每一題optimized欄位最後，必須換行後加一句親切的鉤子，不是冷冰冰的疑問句斷句，而是帶一點關心、有溫度的延伸。
+
+寫法：先問一句關鍵問題，再補一句簡短說明為什麼問、或這跟對方有什麼關係，可加一個溫和表情符號。
+
+範例（參考語氣，不要照抄）：
+
+"你目前有在服用任何藥物嗎？
+
+如果有的話可以先跟我說，我幫你判斷有沒有需要特別留意的地方 😊"
+
+"你目前飲食中的蔬果攝取還OK嗎？
+
+若外食比例高，這類抗氧化營養特別容易攝取不足喔 😊"
+
+規則：
+
+1. 第一句是疑問句，讓用戶只需回覆1-2個字即可
+
+2. 第二句補一句簡短的關心或說明，不是制式問句
+
 3. 不要加括號選項
-4. 範例正確鉤子："你平時有這個困擾嗎？" "想了解怎麼挑選嗎？" "需要我推薦適合的產品嗎？"
-5. 每一題分析完，optimized欄位的最後一行一定是問句，這是強制規則，沒有例外
 
-【連結規則】一題最多一個連結
+4. 可加表情符號（😊 🙂 💡 等溫和符號，避免太多或太誇張）
+
+5. 整體語氣親切自然，像朋友在關心，不是制式客服問句
+
+6. 絕對不可以用肯定句或直述句結尾，最後一定要是疑問句開頭的鉤子
+
+【連結規則】一題最多一個連結，放在鉤子前一行
+
 低意圖：不帶連結
+
 中意圖：問怎麼選/推薦/適合我→帶產品頁；描述困擾/問症狀→帶知識文
+
 高意圖：一律帶產品頁
 
-產品連結：
-益生菌：https://mall.cathay-hcm.com.tw/products/probiotics
-葉黃素：https://happyhabit.tw/92es7e
+【產品頁連結】
+益生菌：
+https://mall.cathay-hcm.com.tw/products/probiotics
+葉黃素：
+https://happyhabit.tw/92es7e
 
-知識文連結：
-益生菌怎麼挑：https://mall.cathay-hcm.com.tw/zh-TW/blogs/happyhabit-nutrition-supplements/益生菌怎麼挑4大指標教你快速選對的方式
-腸胃保健：https://mall.cathay-hcm.com.tw/zh-TW/blogs/happyhabit-digestive-health
-葉黃素是什麼：https://mall.cathay-hcm.com.tw/zh-TW/blogs/happyhabit-eye/what-is-lutein
-葉黃素怎麼挑：https://mall.cathay-hcm.com.tw/zh-TW/blogs/happyhabit-eye/how-to-choose-lutein
-光源影響：https://mall.cathay-hcm.com.tw/zh-TW/blogs/happyhabit-eye/outdoor_light_more_damaging
+【知識文連結（依主題對應）】
+─ 益生菌相關 ─
+・益生菌怎麼挑（選購入門）：
+  https://mall.cathay-hcm.com.tw/zh-TW/blogs/happyhabit-nutrition-supplements/益生菌怎麼挑4大指標教你快速選對的方式
+・益生菌456公式（選購進階）：
+  https://mall.cathay-hcm.com.tw/zh-TW/blogs/happyhabit-nutrition-supplements/益生菌怎麼選從「456」黃金關鍵看懂挑選好菌秘訣
+・便祕脹氣腸道警訊：
+  https://mall.cathay-hcm.com.tw/blogs/happyhabit-digestive-health/便秘脹氣消化不良腸道健康警訊與益生菌解方一次看懂
+・換季體質與腸道保健：
+  https://mall.cathay-hcm.com.tw/zh-TW/blogs/破解迷思/換季體質大亂3個保健習慣＋益生菌幫你穩住腸道
+・腸胃保健總覽：
+  https://mall.cathay-hcm.com.tw/zh-TW/blogs/happyhabit-digestive-health
 
-【缺題建議規則】
-分析三層意圖分佈是否均衡，針對缺口提供2-4個建議新題目。
-每個建議都必須包含完整的suggest_q（問題）和suggest_a（完整回答，含連結和鉤子），不可留空。
+─ 葉黃素相關 ─
+・葉黃素是什麼：
+  https://mall.cathay-hcm.com.tw/zh-TW/blogs/happyhabit-eye/what-is-lutein
+・葉黃素怎麼挑（篇一）：
+  https://mall.cathay-hcm.com.tw/zh-TW/blogs/happyhabit-eye/how-to-choose-lutein
+・葉黃素選購完整攻略（篇二）：
+  https://mall.cathay-hcm.com.tw/zh-TW/blogs/happyhabit-eye/lutein-selection-guide
+・葉黃素常見疑問：
+  https://mall.cathay-hcm.com.tw/zh-TW/blogs/happyhabit-eye/lutein-faq
+・光源對眼睛的影響：
+  https://mall.cathay-hcm.com.tw/zh-TW/blogs/happyhabit-eye/outdoor_light_more_damaging
 
-原始回答的知識內容不能增減，只調語氣。不可查網路資料。
+
+【優化規則】
+
+原始回答的知識內容完全不能增加或刪減，只能調整語氣讓回答更溫馨口語。不可查詢任何網路資料。
+
+【缺題建議規則 - gaps欄位，兩種來源都要找】
+
+來源一：三層意圖分佈不均衡的缺口
+
+來源二（更重要）：所有「鉤子問出去但FAQ庫接不住」的情況，逐一列出
+
+  每筆gaps格式必須包含：
+
+  - source: "鉤子斷層" 或 "意圖不均"
+
+  - related_idx: 如果是來源二，註明是哪一題的idx（鉤子斷層才需要，意圖不均可省略或填-1）
+
+  - issue: 說明缺口（鉤子斷層要說明原題鉤子問了什麼方向）
+
+  - suggest_q: 建議新增的問題
+
+  - suggest_a: 完整建議回答（含連結和鉤子，遵循上述所有規則）
+
+請優先確保來源二（鉤子斷層）被完整記錄，這是最重要的分析目的。每筆gaps的suggest_q和suggest_a絕對不可留空。
 
 只輸出以下JSON格式，不要任何說明文字、不要markdown標記：
-{"items":[{"idx":0,"intent":"低","optimized":"優化回答內容\n鉤子問句？"}],"gaps":[{"layer":"中","issue":"缺口說明文字","suggest_q":"建議的問題","suggest_a":"完整建議回答\n鉤子問句？"}]}`;
+
+{"items":[{"idx":0,"intent":"低","optimized":"優化回答內容\n鉤子問句？\n補充關心語句 😊"}],"gaps":[{"source":"鉤子斷層","related_idx":0,"issue":"缺口說明","suggest_q":"建議問題","suggest_a":"完整建議回答\n鉤子問句？\n補充關心語句 😊"}]}`;
 
   let response;
   try {
@@ -90,7 +181,10 @@ export default async function handler(req, res) {
         model: 'claude-haiku-4-5',
         max_tokens: dynamicMaxTokens,
         system: SYSTEM,
-        messages: [{ role: 'user', content: `分析FAQ輸出JSON：\n${faqText}` }]
+        messages: [{
+          role: 'user',
+          content: `分析以下FAQ並輸出JSON。請記得：設計每題鉤子前，先檢查表格中其他題目是否能接住這個鉤子方向。\n\n${faqText}`
+        }]
       })
     });
   } catch (fetchErr) {
@@ -115,11 +209,11 @@ export default async function handler(req, res) {
     const clean = text.replace(/```json|```/g, '').trim();
     const match = clean.match(/\{[\s\S]*\}/);
     if (!match) {
-      return res.status(500).json({ error: 'NO_JSON_FOUND_IN_RESPONSE', raw_text: text });
+      return res.status(500).json({ error: 'NO_JSON_FOUND_IN_RESPONSE', raw_text: text.substring(0, 1000) });
     }
     json = JSON.parse(match[0]);
   } catch (jsonErr) {
-    return res.status(500).json({ error: 'JSON_PARSE_FAILED', detail: String(jsonErr), raw_text: text });
+    return res.status(500).json({ error: 'JSON_PARSE_FAILED', detail: String(jsonErr), raw_text: text.substring(0, 1000) });
   }
 
   return res.status(200).json(json);
