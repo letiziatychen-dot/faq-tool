@@ -1,3 +1,16 @@
+function sanitizeJsonNewlines(str) {
+  let inString = false, escaped = false, result = '';
+  for (let i = 0; i < str.length; i++) {
+    const c = str[i];
+    if (escaped) { result += c; escaped = false; continue; }
+    if (c === '\\' && inString) { result += c; escaped = true; continue; }
+    if (c === '"') { inString = !inString; result += c; continue; }
+    if (inString && (c === '\n' || c === '\r')) { result += '\\n'; continue; }
+    result += c;
+  }
+  return result;
+}
+
 export default async function handler(req, res) {
 
   if (req.method !== 'POST') {
@@ -182,9 +195,9 @@ https://happyhabit.tw/92es7e
 
 - reason: 新增原因說明，格式為「來源類型：說明內容（引用原問題）」，例如「鉤子無法承接缺口：原題『XXX』的鉤子引導至YYY方向，但FAQ庫無對應題目」
 
-只輸出以下JSON格式，不要任何說明文字、不要markdown標記：
+只輸出以下JSON格式，不要任何說明文字、不要markdown標記。JSON字串值中的換行請用 \\n 表示，不要直接換行：
 
-{"items":[{"idx":0,"intent":"低","optimized":"優化回答內容\n鉤子問句？\n補充關心語句 😊"}],"gaps":[{"source":"鉤子斷層","related_idx":0,"cat":"分類名稱","suggest_q":"建議問題","suggest_c":"建議回答主體\n連結（如有）\n鉤子問句？\n補充關心語句 😊","intent":"中","reason":"鉤子無法承接缺口：原題『XXX』的鉤子引導至YYY方向，FAQ庫無對應題目"}]}`;
+{"items":[{"idx":0,"intent":"低","optimized":"優化回答內容\\n鉤子問句？\\n補充關心語句 😊"}],"gaps":[{"source":"鉤子斷層","related_idx":0,"cat":"分類名稱","suggest_q":"建議問題","suggest_c":"建議回答主體\\n連結（如有）\\n鉤子問句？\\n補充關心語句 😊","intent":"中","reason":"鉤子無法承接缺口：原題『XXX』的鉤子引導至YYY方向，FAQ庫無對應題目"}]}`;
 
   let response;
   try {
@@ -229,7 +242,9 @@ https://happyhabit.tw/92es7e
     if (!match) {
       return res.status(500).json({ error: 'NO_JSON_FOUND_IN_RESPONSE', raw_text: text.substring(0, 1000) });
     }
-    json = JSON.parse(match[0]);
+    // 修正 JSON 字串值中的裸換行，避免 JSON.parse 失敗
+    const sanitized = sanitizeJsonNewlines(match[0]);
+    json = JSON.parse(sanitized);
   } catch (jsonErr) {
     return res.status(500).json({ error: 'JSON_PARSE_FAILED', detail: String(jsonErr), raw_text: text.substring(0, 1000) });
   }
