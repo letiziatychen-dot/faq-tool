@@ -144,7 +144,14 @@ export default async function handler(req, res) {
 
 【連結規則】一題最多一個連結，格式如下：
 
-連結位置：放在鉤子前一行
+連結順序（嚴格遵守）：
+1. 回答主體內容
+2. 可以參考>> [連結網址]
+3. 鉤子問句
+
+❌ 禁止把連結放在回答內容之前或之中
+✅ 連結必須在回答主體結束後、鉤子開始前，獨立一行
+
 連結格式：必須在連結前加上「可以參考>>」，例如：
 可以參考>> https://mall.cathay-hcm.com.tw/products/probiotics
 
