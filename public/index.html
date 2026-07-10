@@ -409,7 +409,7 @@ async function downloadExcel() {
   ];
 
   // 主表頭
-  const hRow = ws.addRow(['分類', '問題', '原始回答', '優化版回答', '意圖等級', '']);
+  const hRow = ws.addRow(['分類', '問題', '原始回答', '優化版回答', '意圖等級', '銜接問題編號']);
   hRow.eachCell(cell => {
     cell.font = { bold: true, color: { argb: 'FF1A3A5C' } };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EDF2' } };
@@ -421,7 +421,7 @@ async function downloadExcel() {
   sortedItems.forEach(it => {
     const r = rows[it.idx];
     if (!r) return;
-    const dRow = ws.addRow([r.cat, r.q, r.a, it.optimized||'', it.intent||'', '']);
+    const dRow = ws.addRow([r.cat, r.q, r.a, it.optimized||'', it.intent||'', it.hook_link||'']);
     dRow.getCell(4).alignment = { wrapText: true, vertical: 'top' };
     dRow.getCell(3).alignment = { wrapText: true, vertical: 'top' };
   });
