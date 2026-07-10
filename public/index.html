@@ -413,6 +413,22 @@ async function downloadExcel() {
   const qMap = {};
   rows.forEach((r, i) => { qMap[`Q${i+1}`] = r.q; });
 
+  // 建立 缺N → 建議問題文字 的對照表
+  const gapMap = {};
+  (json.gaps || []).forEach(g => {
+    const m = (g.suggest_q || '').match(/^缺\d+/);
+    // hook_link 填的是缺題編號，gaps 裡用 related_idx 關聯；用 source 跟 hook_link 比對
+    // 直接用 gaps 陣列順序建立 缺1、缺2…
+  });
+  // 用 items 裡的 hook_link 缺N 編號，對應到 gaps 裡同名的缺題
+  // gaps 裡的缺題沒有明確 id，但 items.hook_link = "缺1" 對應 gaps 第1個鉤子斷層缺題
+  // 重新建立：收集所有 items 裡出現的「缺N」，依序對應 gaps 中 source=鉤子斷層 的項目
+  const hookGaps = (json.gaps || []).filter(g => g.source === '鉤子斷層');
+  const distGaps = (json.gaps || []).filter(g => g.source !== '鉤子斷層');
+  let gapIdx = 1;
+  hookGaps.forEach(g => { gapMap[`缺${gapIdx++}`] = g.suggest_q || ''; });
+  distGaps.forEach(g => { gapMap[`缺${gapIdx++}`] = g.suggest_q || ''; });
+
   // 主表頭
   const hRow = ws.addRow(['分類', '問題', '原始回答', '優化版回答', '意圖等級', '銜接問題編號', '銜接題摘要']);
   hRow.eachCell(cell => {
@@ -434,7 +450,8 @@ async function downloadExcel() {
       if (qKey && qMap[qKey]) {
         hookSummary = qMap[qKey].length > 25 ? qMap[qKey].substring(0, 25) + '…' : qMap[qKey];
       } else if (hookLink.startsWith('缺')) {
-        hookSummary = '（缺題待補，見缺題建議區）';
+        const gapQ = gapMap[hookLink] || '';
+        hookSummary = gapQ ? `${hookLink}：${gapQ.length > 20 ? gapQ.substring(0, 20) + '…' : gapQ}` : `${hookLink}（見缺題建議區）`;
       }
     }
     const dRow = ws.addRow([r.cat, r.q, r.a, it.optimized||'', it.intent||'', hookLink, hookSummary]);
