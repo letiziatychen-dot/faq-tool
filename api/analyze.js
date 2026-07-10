@@ -135,12 +135,11 @@ hook_link 欄位填空字串 ""。
    - ✅ 正確：鉤子問「你有便秘嗎？」→ hook_link 填真正有一題問「益生菌可以改善便秘嗎？」的那一列
 
 3. hook_link 填寫規則（嚴格遵守）：
-   - 有找到真實對應題目 → 填入該題的列數，格式為「第N列」（N = 該題在輸入 FAQ 中的順序，從1開始計）
-   - 若輸入的 FAQ 有明確題號（如 Q1、Q2）→ 填題號（如「Q5」）
+   - 輸入的 FAQ 一定有明確題號（Q1、Q2、Q3⋯），hook_link 一律填題號格式，例如「Q5」
    - 找不到對應題目 → 列入缺題建議，hook_link 填缺題建議的編號（如「缺1」）
    - 維持原文類題目（退換貨、政策等）→ hook_link 填空字串 ""
    - ❌ 絕對禁止：填一個「看起來相關」但實際上主題不符的題號，寧可填「缺N」也不亂填
-   - ❌ 絕對禁止：hook_link 填自己這一題的列號（如第2列的題目，hook_link 不可以填「第2列」）。鉤子的目的是銜接「下一題」，指向自己毫無意義。
+   - ❌ 絕對禁止：hook_link 填自己這一題的題號（如 Q2 的題目，hook_link 不可以填「Q2」）。鉤子的目的是銜接「下一題」，指向自己毫無意義。
 
 【鉤子設計規則】
 
@@ -297,19 +296,21 @@ hook_link 欄位填空字串 ""。
 
 function validateHookLinks(json) {
   if (!json || !Array.isArray(json.items)) return json;
-  const totalRows = json.items.length;
   let gapCounter = Array.isArray(json.gaps) ? json.gaps.length + 1 : 1;
 
   json.items = json.items.map((item) => {
-    const rowNum = (item.idx ?? 0) + 1; // 1-based row number
+    const qNum = (item.idx ?? 0) + 1; // Q number = idx + 1
     const hl = (item.hook_link || '').trim();
 
-    if (!hl) return item; // empty = ok (policy questions)
+    if (!hl) return item;
 
-    // Detect self-reference: "第N列" where N == rowNum
+    // Detect self-reference: "QN" where N == qNum, or "第N列" where N == qNum
+    const qMatch = hl.match(/^Q(\d+)$/i);
     const rowMatch = hl.match(/^第(\d+)列$/);
-    if (rowMatch && parseInt(rowMatch[1], 10) === rowNum) {
-      // Self-reference detected — convert to gap
+    const isSelf = (qMatch && parseInt(qMatch[1], 10) === qNum) ||
+                   (rowMatch && parseInt(rowMatch[1], 10) === qNum);
+
+    if (isSelf) {
       const gapId = `缺${gapCounter++}`;
       item.hook_link = gapId;
       if (!Array.isArray(json.gaps)) json.gaps = [];
@@ -317,10 +318,10 @@ function validateHookLinks(json) {
         source: '鉤子斷層',
         related_idx: item.idx,
         cat: item.cat || '',
-        suggest_q: `（待補）對應「${item.optimized ? item.optimized.substring(0, 20) : ''}...」鉤子方向的下一題`,
+        suggest_q: `（待補）接住 Q${qNum} 鉤子方向的下一題`,
         suggest_c: '請根據本題鉤子問句設計對應回答，推進使用者意圖。',
-        intent: item.intent === '低' ? '中' : item.intent === '中' ? '高' : '高',
-        reason: `第${rowNum}列的 hook_link 原本填了自己（第${rowNum}列），屬於自我循環，已自動轉為缺題 ${gapId}。請補充能接住此題鉤子方向的新問題。`
+        intent: item.intent === '低' ? '中' : '高',
+        reason: `Q${qNum} 的 hook_link 原本填了自己（${hl}），屬於自我循環，已自動轉為缺題 ${gapId}。請補充能接住此題鉤子方向的新問題。`
       });
     }
 

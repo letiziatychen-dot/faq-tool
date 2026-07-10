@@ -402,14 +402,19 @@ async function downloadExcel() {
   ws.columns = [
     { width: 18 },  // A 分類
     { width: 30 },  // B 問題
-    { width: 45 },  // C 原始回答 / 建議回答
+    { width: 45 },  // C 原始回答
     { width: 52 },  // D 優化版回答
     { width: 10 },  // E 意圖等級
-    { width: 42 },  // F 新增原因（缺題區使用）
+    { width: 14 },  // F 銜接問題編號
+    { width: 35 },  // G 銜接題摘要
   ];
 
+  // 建立 Q號 → 問題文字 的對照表
+  const qMap = {};
+  rows.forEach((r, i) => { qMap[`Q${i+1}`] = r.q; });
+
   // 主表頭
-  const hRow = ws.addRow(['分類', '問題', '原始回答', '優化版回答', '意圖等級', '銜接問題編號']);
+  const hRow = ws.addRow(['分類', '問題', '原始回答', '優化版回答', '意圖等級', '銜接問題編號', '銜接題摘要']);
   hRow.eachCell(cell => {
     cell.font = { bold: true, color: { argb: 'FF1A3A5C' } };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EDF2' } };
@@ -421,9 +426,22 @@ async function downloadExcel() {
   sortedItems.forEach(it => {
     const r = rows[it.idx];
     if (!r) return;
-    const dRow = ws.addRow([r.cat, r.q, r.a, it.optimized||'', it.intent||'', it.hook_link||'']);
+    const hookLink = it.hook_link || '';
+    // G 欄：查對照表，填銜接題的問題文字（前25字）；缺題填提示；空白填空
+    let hookSummary = '';
+    if (hookLink) {
+      const qKey = hookLink.toUpperCase().startsWith('Q') ? hookLink.toUpperCase() : null;
+      if (qKey && qMap[qKey]) {
+        hookSummary = qMap[qKey].length > 25 ? qMap[qKey].substring(0, 25) + '…' : qMap[qKey];
+      } else if (hookLink.startsWith('缺')) {
+        hookSummary = '（缺題待補，見缺題建議區）';
+      }
+    }
+    const dRow = ws.addRow([r.cat, r.q, r.a, it.optimized||'', it.intent||'', hookLink, hookSummary]);
     dRow.getCell(4).alignment = { wrapText: true, vertical: 'top' };
     dRow.getCell(3).alignment = { wrapText: true, vertical: 'top' };
+    dRow.getCell(7).alignment = { wrapText: true, vertical: 'top' };
+    dRow.getCell(7).font = { color: { argb: 'FF5D6D7E' }, italic: true };
   });
 
   // 缺題建議區塊
@@ -431,15 +449,15 @@ async function downloadExcel() {
     ws.addRow([]);
 
     // 區塊標題列
-    const titleRow = ws.addRow(['【缺題建議】', '', '', '', '', '']);
+    const titleRow = ws.addRow(['【缺題建議】', '', '', '', '', '', '']);
     titleRow.getCell(1).font = { bold: true, size: 12, color: { argb: 'FF7B2D00' } };
     titleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE8E3' } };
-    for (let c = 2; c <= 6; c++) {
+    for (let c = 2; c <= 7; c++) {
       titleRow.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE8E3' } };
     }
 
     // 缺題表頭
-    const gHRow = ws.addRow(['分類', '問題（建議新增題目）', '回答（建議新增回答）', '優化版回答（留空）', '意圖等級', '新增原因']);
+    const gHRow = ws.addRow(['分類', '問題（建議新增題目）', '回答（建議新增回答）', '優化版回答（留空）', '意圖等級', '新增原因', '']);
     gHRow.eachCell(cell => {
       cell.font = { bold: true, color: { argb: 'FF7B2D00' } };
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE8E3' } };
